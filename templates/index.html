@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        .menu-container {
+            width: 20%;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            margin: 10px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .chat-container {
+            width: 80%;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            margin: 10px;
+        }
+        .chat-area {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ddd;
+        }
+        .chat-area p {
+            margin: 5px 0;
+        }
+        .input-area {
+            display: flex;
+            padding: 10px;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .input-area button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .input-area button:hover {
+            background-color: #0056b3;
+        }
+        .conversation {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+        }
+        .conversation:hover {
+            background-color: #f0f0f0;
+        }
+        .new-chat-btn {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 30px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .new-chat-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-container" id="menuContainer"></div>
+    <div class="chat-container">
+        <div class="chat-area" id="chatArea"></div>
+        <div class="input-area">
+            <button class="new-chat-btn" onclick="createNewChat()">+</button>
+            <input type="text" id="userInput" placeholder="Type your message here...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+    <script>
+        let conversations = [];
+        let currentChatIndex = null;
+
+        function renderConversations() {
+            const menuContainer = document.getElementById('menuContainer');
+            menuContainer.innerHTML = '';
+            conversations.forEach((conversation, index) => {
+                const div = document.createElement('div');
+                div.className = 'conversation';
+                div.textContent = `Chat at ${conversation.timestamp}`;
+                div.onclick = () => loadChat(index);
+                menuContainer.appendChild(div);
+            });
+        }
+
+        function loadChat(index) {
+            currentChatIndex = index;
+            const chatArea = document.getElementById('chatArea');
+            chatArea.innerHTML = '';
+            conversations[index].messages.forEach(message => {
+                chatArea.innerHTML += `<p><strong>${message.sender}:</strong> ${message.text}</p>`;
+            });
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            if (currentChatIndex === null) {
+                alert('Please start a new chat first.');
+                return;
+            }
+
+            const chatArea = document.getElementById('chatArea');
+            chatArea.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+            userInput.value = '';
+
+            // Fetch the response from the AI model
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message })
+            });
+            const data = await response.json();
+            const aiResponse = data.response;
+
+            // Display typing animation
+            let index = 0;
+            const aiMessageElement = document.createElement('p');
+            aiMessageElement.innerHTML = `<strong>AI Assistant:</strong> `;
+            chatArea.appendChild(aiMessageElement);
+
+            const typeLetter = () => {
+                if (index < aiResponse.length) {
+                    aiMessageElement.innerHTML += aiResponse[index];
+                    index++;
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                    setTimeout(typeLetter,10 ); // Adjust typing speed here
+                } else {
+                    conversations[currentChatIndex].messages.push({ sender: 'AI Assistant', text: aiResponse });
+                }
+            };
+
+            typeLetter();
+
+            conversations[currentChatIndex].messages.push({ sender: 'You', text: message });
+        }
+
+        function createNewChat() {
+            const timestamp = new Date().toLocaleString();
+            conversations.push({ timestamp, messages: [] });
+            currentChatIndex = conversations.length - 1;
+            renderConversations();
+            loadChat(currentChatIndex);
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
